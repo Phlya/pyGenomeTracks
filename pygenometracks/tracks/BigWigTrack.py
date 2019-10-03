@@ -40,6 +40,9 @@ file_type = {}
         if 'color' not in self.properties:
             self.properties['color'] = DEFAULT_BIGWIG_COLOR
 
+        if 'alpha' not in self.properties:
+            self.properties['alpha'] = 1
+
         if 'negative color' not in self.properties:
             self.properties['negative color'] = self.properties['color']
 
@@ -83,7 +86,14 @@ file_type = {}
                                                                                self.properties['file']))
 
         if chrom_region not in self.bw.chroms().keys():
+            chrom_region_before = chrom_region
             chrom_region = self.change_chrom_names(chrom_region)
+            if chrom_region not in self.bw.chroms().keys():
+                self.log.error("*Error*\nNeither " + chrom_region_before + " "
+                               "nor " + chrom_region + " exits as a chromosome"
+                               " name inside the bigwig file.\n")
+                return
+
         chrom_region = self.check_chrom_str_bytes(self.bw.chroms().keys(), chrom_region)
 
         if chrom_region not in self.bw.chroms().keys():
@@ -119,7 +129,7 @@ file_type = {}
         x_values = np.linspace(start_region, end_region, num_bins)
         if self.plot_type == 'line':
             if self.properties['color'] == self.properties['negative color']:
-                    ax.plot(x_values, scores_per_bin, '-', linewidth=self.size, color=self.properties['color'])
+                ax.plot(x_values, scores_per_bin, '-', linewidth=self.size, color=self.properties['color'])
             else:
                 import warnings
                 warnings.warn('Line plots with a different negative color might not look pretty')
@@ -140,9 +150,11 @@ file_type = {}
         else:
             scores_per_bin[np.isnan(scores_per_bin)]=0
             ax.fill_between(x_values, scores_per_bin, linewidth=0.1, color=self.properties['color'],
-                            facecolor=self.properties['color'], where=scores_per_bin >= 0, interpolate=True)
+                            facecolor=self.properties['color'], where=scores_per_bin >= 0, interpolate=True,
+                            alpha=self.properties['alpha'])
             ax.fill_between(x_values, scores_per_bin, linewidth=0.1, color=self.properties['negative color'],
-                            facecolor=self.properties['negative color'], where=scores_per_bin < 0, interpolate=True)
+                            facecolor=self.properties['negative color'], where=scores_per_bin < 0, interpolate=True,
+                            alpha=self.properties['alpha'])
 
         ymin, ymax = ax.get_ylim()
         if 'max_value' in self.properties and self.properties['max_value'] != 'auto':

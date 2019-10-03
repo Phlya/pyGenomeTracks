@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 
 class HiCMatrixTrack(GenomeTrack):
-    SUPPORTED_ENDINGS = ['.h5', '.cool' '.mcool']
+    SUPPORTED_ENDINGS = ['.h5', '.cool', '.mcool']
     TRACK_TYPE = 'hic_matrix'
     OPTIONS_TXT = """
 title =
@@ -37,7 +37,7 @@ transform = log1p
 # the default is to extend neighboring bins to
 # obtain an aesthetically pleasant output
 show_masked_bins = no
-# if the track wants to be plotted upside-down:
+# if you want to plot the track upside-down:
 # orientation = inverted
 # optional if the values in the matrix need to be scaled the
 # following parameter can be used. This is useful to plot multiple hic-matrices on the same scale
@@ -147,7 +147,13 @@ file_type = {}
         log.debug('chrom_region {}, region_start {}, region_end {}'.format(chrom_region, region_start, region_end))
         chrom_sizes = self.hic_ma.get_chromosome_sizes()
         if chrom_region not in chrom_sizes:
+            chrom_region_before = chrom_region
             chrom_region = self.change_chrom_names(chrom_region)
+            if chrom_region not in chrom_sizes:
+                self.log.error("*Error*\nNeither " + chrom_region_before + " "
+                               "nor " + chrom_region + " exits as a chromosome"
+                               " name on the matrix.\n")
+                return
 
         chrom_region = self.check_chrom_str_bytes(chrom_sizes, chrom_region)
         if region_end > chrom_sizes[chrom_region]:
@@ -196,13 +202,19 @@ file_type = {}
 
             elif self.properties['transform'] == '-log':
                 mask = matrix == 0
-                matrix[mask] = matrix[mask is False].min()
-                matrix = -1 * np.log(matrix)
+                try:
+                    matrix[mask] = matrix[mask == False].min()
+                    matrix = -1 * np.log(matrix)
+                except ValueError:
+                    self.log.info('All values are 0, no log applied.')
 
             elif self.properties['transform'] == 'log':
                 mask = matrix == 0
-                matrix[mask] = matrix[mask is False].min()
-                matrix = np.log(matrix)
+                try:
+                    matrix[mask] = matrix[mask == False].min()
+                    matrix = np.log(matrix)
+                except ValueError:
+                    self.log.info('All values are 0, no log applied.')
 
         if 'max_value' in self.properties and self.properties['max_value'] != 'auto':
             vmax = self.properties['max_value']
@@ -250,29 +262,33 @@ file_type = {}
             formatter = LogFormatter(10, labelOnlyBase=False)
             aa = np.array([1, 2, 5])
             tick_values = np.concatenate([aa * 10 ** x for x in range(10)])
-            cobar = plt.colorbar(self.img, ticks=tick_values, format=formatter, ax=cbar_ax, fraction=0.95)
+            try:
+                cobar = plt.colorbar(self.img, ticks=tick_values, format=formatter, ax=cbar_ax, fraction=0.95)
+            except AttributeError:
+                return
         else:
-            cobar = plt.colorbar(self.img, ax=cbar_ax, fraction=0.95)
+            try:
+                cobar = plt.colorbar(self.img, ax=cbar_ax, fraction=0.95)
+            except AttributeError:
+                return
 
         cobar.solids.set_edgecolor("face")
         cobar.ax.tick_params(labelsize='smaller')
         cobar.ax.yaxis.set_ticks_position('left')
 
         # adjust the labels of the colorbar
-        labels = cobar.ax.get_yticklabels()
         ticks = cobar.ax.get_yticks()
-
-        if ticks[0] == 0:
+        labels = cobar.ax.set_yticklabels(ticks.astype('float32'))
+        (vmin, vmax) = cobar.mappable.get_clim()
+        for idx in np.where(ticks == vmin)[0]:
             # if the label is at the start of the colobar
             # move it above avoid being cut or overlapping with other track
-            labels[0].set_verticalalignment('bottom')
-        if ticks[-1] == 1:
+            labels[idx].set_verticalalignment('bottom')
+        for idx in np.where(ticks == vmax)[0]:
             # if the label is at the end of the colobar
             # move it a bit inside to avoid overlapping
             # with other labels
-            labels[-1].set_verticalalignment('top')
-
-        cobar.ax.set_yticklabels(labels)
+            labels[idx].set_verticalalignment('top')
 
     def pcolormesh_45deg(self, ax, matrix_c, start_pos_vector, vmin=None, vmax=None):
         """

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-from __future__ import division
 
 import logging
 from configparser import ConfigParser
-
+from ast import literal_eval
+import time
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -109,16 +109,11 @@ class PlotTracks(object):
             if 'title' in properties:
                 # adjust titles that are too long
                 # if the track label space is small
+                assert(sys.version_info[0] != 2)
                 if track_label_width < 0.1:
-                    if sys.version_info[0] == 2:
-                        properties['title'] = textwrap.fill(properties['title'].encode("UTF-8"), 12)
-                    else:
-                        properties['title'] = textwrap.fill(properties['title'], 12)
+                    properties['title'] = textwrap.fill(properties['title'], 12)
                 else:
-                    if sys.version_info[0] == 2:
-                        properties['title'] = textwrap.fill(properties['title'].encode("UTF-8"), 30)
-                    else:
-                        properties['title'] = textwrap.fill(properties['title'], 30)
+                    properties['title'] = textwrap.fill(properties['title'], 30)
 
         log.info("time initializing track(s):")
         self.print_elapsed(start)
@@ -158,7 +153,7 @@ class PlotTracks(object):
             if track_dict['overlay previous'] != 'no':
                 continue
             elif 'x-axis' in track_dict and track_dict['x-axis'] is True:
-                height = track_dict['fontsize'] / 10
+                height = track_dict['fontsize'] / 8
             elif 'height' in track_dict:
                 height = track_dict['height']
             # compute the height of a Hi-C track
@@ -305,7 +300,6 @@ class PlotTracks(object):
         :param tracks_file: file path containing the track configuration
         :return: array of dictionaries and vlines_file. One dictionary per track
         """
-        from ast import literal_eval
         parser = ConfigParser(dict_type=MultiDict, strict=False)
         parser.read_file(open(tracks_file, 'r'))
 
@@ -320,7 +314,7 @@ class PlotTracks(object):
                 track_options['x-axis'] = True
             for name, value in parser.items(section_name):
                 if name in ['max_value', 'min_value', 'depth', 'height', 'line width',
-                            'fontsize', 'scale factor', 'number of bins'] and value != 'auto':
+                            'fontsize', 'scale factor', 'number of bins', 'interval_height', 'alpha'] and value != 'auto':
                     track_options[name] = literal_eval(value)
                 else:
                     track_options[name] = value
@@ -435,7 +429,6 @@ class PlotTracks(object):
 
     @staticmethod
     def print_elapsed(start):
-        import time
         if start:
             log.info(time.time() - start)
         return time.time()

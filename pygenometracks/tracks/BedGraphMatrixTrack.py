@@ -1,6 +1,7 @@
 from . BedGraphTrack import BedGraphTrack
 from . GenomeTrack import GenomeTrack
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class BedGraphMatrixTrack(BedGraphTrack):
@@ -54,9 +55,10 @@ file_type = {}
         Plots a bedgraph matrix file, that instead of having
         a single value per bin, it has several values.
         """
-
-        values_list, start_pos = self.get_scores(chrom_region, start_region, end_region)
-
+        try:
+            values_list, start_pos = self.get_scores(chrom_region, start_region, end_region)
+        except TypeError:
+            return
         matrix_rows = []
         for values in values_list:
             values = list(map(float, values))
@@ -90,7 +92,7 @@ file_type = {}
 
             if self.properties['plot horizontal lines'] == 'yes':
                 ax.grid(True)
-                ax.grid(True, which='y')
+                ax.grid(True, axis='y')
                 ax.axhline(y=0, color='black', linewidth=1)
                 ax.tick_params(axis='y', which='minor', left='on')
 
@@ -108,23 +110,24 @@ file_type = {}
         if self.properties['type'] == 'lines':
             super(BedGraphMatrixTrack, self).plot_y_axis(ax, plot_axis)
         else:
-            import matplotlib.pyplot as plt
-
-            cobar = plt.colorbar(self.img, ax=ax, fraction=0.95)
+            try:
+                cobar = plt.colorbar(self.img, ax=ax, fraction=0.95)
+            except AttributeError:
+                return
 
             cobar.solids.set_edgecolor("face")
             cobar.ax.tick_params(labelsize='smaller')
             cobar.ax.yaxis.set_ticks_position('left')
             # adjust the labels of the colorbar
-            labels = cobar.ax.get_yticklabels()
             ticks = cobar.ax.get_yticks()
-            if ticks[0] == 0:
+            labels = cobar.ax.set_yticklabels(ticks.astype('float32'))
+            (vmin, vmax) = cobar.mappable.get_clim()
+            for idx in np.where(ticks == vmin)[0]:
                 # if the label is at the start of the colobar
                 # move it above avoid being cut or overlapping with other track
-                labels[0].set_verticalalignment('bottom')
-            if ticks[-1] == 1:
+                labels[idx].set_verticalalignment('bottom')
+            for idx in np.where(ticks == vmax)[0]:
                 # if the label is at the end of the colobar
                 # move it a bit inside to avoid overlapping
                 # with other labels
-                labels[-1].set_verticalalignment('top')
-            cobar.ax.set_yticklabels(labels)
+                labels[idx].set_verticalalignment('top')

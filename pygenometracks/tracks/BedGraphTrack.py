@@ -1,12 +1,16 @@
 from . GenomeTrack import GenomeTrack
 from .. utilities import file_to_intervaltree
 import numpy as np
+import sys
 
 DEFAULT_BEDGRAPH_COLOR = '#a6cee3'
 
 
 class BedGraphTrack(GenomeTrack):
-    SUPPORTED_ENDINGS = ['.bg', '.bg.gz', '.bg.bgz']
+    SUPPORTED_ENDINGS = ['.bg', '.bg.gz', '.bg.bgz',
+                         '.bedgraph', '.bedgraph.gz', '.bedgraph.bgz',
+                         '.bedGraph', '.bedGraph.gz', '.bedGraph.bgz',
+                         '.bdg', '.bdg.gz', '.bdg.bgz']
     TRACK_TYPE = 'bedgraph'
     OPTIONS_TXT = GenomeTrack.OPTIONS_TXT + """
 color = green
@@ -46,6 +50,9 @@ file_type = {}
 
         if 'color' not in self.properties:
             self.properties['color'] = DEFAULT_BEDGRAPH_COLOR
+
+        if 'alpha' not in self.properties:
+            self.properties['alpha'] = 1
 
         if 'negative color' not in self.properties:
             self.properties['negative color'] = self.properties['color']
@@ -126,12 +133,31 @@ file_type = {}
         pos_list = []
         if self.tbx is not None:
             if chrom_region not in self.tbx.contigs:
+                chrom_region_before = chrom_region
                 chrom_region = self.change_chrom_names(chrom_region)
-            chrom_region = self.check_chrom_str_bytes(self.tbx.contigs, chrom_region)
+                if chrom_region not in self.tbx.contigs:
+                    sys.stderr.write("*Error*\nNeither"
+                                     " " + chrom_region_before + " nor"
+                                     " " + chrom_region + " exits as a "
+                                     "chromosome name inside the provided "
+                                     "file.\n")
+                    return
+
+            chrom_region = self.check_chrom_str_bytes(self.tbx.contigs,
+                                                      chrom_region)
             iterator = self.tbx.fetch(chrom_region, start_region, end_region)
+
         else:
             if chrom_region not in list(self.interval_tree):
+                chrom_region_before = chrom_region
                 chrom_region = self.change_chrom_names(chrom_region)
+                if chrom_region not in list(self.interval_tree):
+                    sys.stderr.write("*Error*\nNeither"
+                                     " " + chrom_region_before + " nor"
+                                     " " + chrom_region + " exits as a "
+                                     "chromosome name inside the bedgraph "
+                                     "file.\n")
+                    return
             chrom_region = self.check_chrom_str_bytes(self.interval_tree, chrom_region)
             iterator = iter(sorted(self.interval_tree[chrom_region][start_region - 10000:end_region + 10000]))
 
@@ -174,7 +200,7 @@ file_type = {}
             # draw a vertical line for each fragment region center
             ax.fill_between(pos_list, score_list, linewidth=0.1,
                             facecolor=self.properties['color'],
-                            edgecolor='none')
+                            edgecolor='none', alpha=self.properties['alpha'])
             ax.vlines(pos_list, [0], score_list, color='olive', linewidth=0.5)
             ax.plot(pos_list, score_list, '-', color='slateblue', linewidth=0.7)
         else:
@@ -200,9 +226,9 @@ file_type = {}
 
             else:
                 ax.fill_between(x_values, score_list, linewidth=0.1, color=self.properties['color'],
-                                facecolor=self.properties['color'], where=score_list >= 0)
+                                facecolor=self.properties['color'], where=score_list >= 0, alpha=self.properties['alpha'])
                 ax.fill_between(x_values, score_list, linewidth=0.1, color=self.properties['negative color'],
-                                facecolor=self.properties['negative color'], where=score_list < 0)
+                                facecolor=self.properties['negative color'], where=score_list < 0, alpha=self.properties['alpha'])
 
         ymax = self.properties['max_value']
         ymin = self.properties['min_value']
